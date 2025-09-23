@@ -1,0 +1,19 @@
+services:
+  lio-sam-ntu:
+    build:
+        context: .
+        dockerfile: Dockerfile
+    container_name: lio-sam-ntu
+    image: lio-sam-ntu
+    init: true
+    stdin_open: true    
+    tty: true               
+    environment:
+      - DISPLAY=${DISPLAY}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /home/joaogobeti/embraer/SLAM/bags/:/bags/
+      - /home/joaogobeti/embraer/SLAM/LIO-SAM-ntu:/root/catkin_ws/src/LIO-SAM-ntu
+    command: bash

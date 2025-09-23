@@ -86,6 +86,10 @@ public:
     float gpsCovThreshold;
     float poseCovThreshold;
 
+    // Load pcd
+    bool loadPCD;
+    string loadPCDDirectory;
+
     // Save pcd
     bool savePCD;
     string savePCDDirectory;
@@ -173,6 +177,8 @@ public:
         nh.param<float>("lio_sam/gpsCovThreshold", gpsCovThreshold, 2.0);
         nh.param<float>("lio_sam/poseCovThreshold", poseCovThreshold, 25.0);
 
+        nh.param<bool>("lio_sam/loadPCD", loadPCD, false);
+        nh.param<std::string>("lio_sam/loadPCDDirectory", loadPCDDirectory, "/bags/PCD/");
         nh.param<bool>("lio_sam/savePCD", savePCD, false);
         nh.param<std::string>("lio_sam/savePCDDirectory", savePCDDirectory, "/Downloads/LOAM/");
 

@@ -234,11 +234,104 @@ public:
         matP = cv::Mat(6, 6, CV_32F, cv::Scalar::all(0));
     }
 
+    bool loadMap() 
+    {
+        if (!loadPCD) {
+            ROS_INFO("Not loading map, loadPCD is set to false");
+            return true;
+        }
+        ROS_INFO("Loading map...");
+        std::string cornerFile = loadPCDDirectory + "CornerMap.pcd";
+        std::string surfFile = loadPCDDirectory + "SurfMap.pcd";
+        std::string globalMapFile = loadPCDDirectory + "GlobalMap.pcd";
+        std::string cloudKeyPoses3DFile = loadPCDDirectory + "trajectory.pcd";
+        std::string cloudKeyPoses6DFile = loadPCDDirectory + "KfCloudPose.pcd";
+        bool hasSavedPCDs = false;
+
+        // Check if both PCD files exist
+        std::ifstream cornerTest(cornerFile);
+        std::ifstream surfTest(surfFile);
+        bool cornerExists = cornerTest.good();
+        bool surfExists = surfTest.good();
+        cornerTest.close();
+        surfTest.close();
+        printf("cornerExists: %d, surfExists: %d\n", cornerExists, surfExists);
+
+        pcl::PointCloud<PointType>::Ptr mapCornerCloud;
+        pcl::PointCloud<PointType>::Ptr mapSurfCloud;
+        mapCornerCloud.reset(new pcl::PointCloud<PointType>());
+        mapSurfCloud.reset(new pcl::PointCloud<PointType>());
+
+        if (cornerExists && surfExists) {
+            // Load map if feature clouds exists
+            bool loaded = pcl::io::loadPCDFile<PointType>(cornerFile, *mapCornerCloud) != -1;
+            loaded &= pcl::io::loadPCDFile<PointType>(surfFile, *mapSurfCloud) != -1;
+            loaded &= pcl::io::loadPCDFile<PointType>(cloudKeyPoses3DFile, *cloudKeyPoses3D) != -1;
+            loaded &= pcl::io::loadPCDFile<PointTypePose>(cloudKeyPoses6DFile, *cloudKeyPoses6D) != -1;
+            if (loaded) {
+                ROS_INFO("Loaded saved map: %lu corner points, %lu surface points",
+                        mapCornerCloud->points.size(), mapSurfCloud->points.size());
+                hasSavedPCDs = true;
+            } else {
+                mapCornerCloud->clear();
+                mapSurfCloud->clear();
+            }
+        }
+
+        cornerCloudKeyFrames.clear();
+        surfCloudKeyFrames.clear();
+
+        for (size_t i = 0; i < cloudKeyPoses6D->points.size(); ++i) {
+            pcl::PointCloud<PointType>::Ptr corner(new pcl::PointCloud<PointType>());
+            pcl::PointCloud<PointType>::Ptr surf(new pcl::PointCloud<PointType>());
+            
+            std::string cornerFile = loadPCDDirectory + "cornerCloudKeyFrame_" + std::to_string(i) + ".pcd";
+            std::string surfFile = loadPCDDirectory + "surfCloudKeyFrame_" + std::to_string(i) + ".pcd";
+            
+            
+            if (pcl::io::loadPCDFile<PointType>(cornerFile, *corner) == -1 ||
+                pcl::io::loadPCDFile<PointType>(surfFile, *surf) == -1) {
+                ROS_WARN("Failed to load keyframe %lu", i);
+                continue;
+            }
+
+            cornerCloudKeyFrames.push_back(corner);
+            surfCloudKeyFrames.push_back(surf);
+        }
+        printf("Loaded %lu key frames\n", cornerCloudKeyFrames.size());
+
+        // Proceed with map reconstruction if no saved map is found
+       
+        // Downsample the surrounding corner key frames (or map)
+        downSizeFilterCorner.setInputCloud(mapCornerCloud);
+        downSizeFilterCorner.filter(*laserCloudCornerFromMapDS);
+        laserCloudCornerFromMapDSNum = laserCloudCornerFromMapDS->size();
+        // Downsample the surrounding surf key frames (or map)
+        downSizeFilterSurf.setInputCloud(mapSurfCloud);
+        downSizeFilterSurf.filter(*laserCloudSurfFromMapDS);
+        laserCloudSurfFromMapDSNum = laserCloudSurfFromMapDS->size();
+        printf("Creating kd-trees...\n");
+        kdtreeCornerFromMap->setInputCloud(laserCloudCornerFromMapDS);
+        kdtreeSurfFromMap->setInputCloud(laserCloudSurfFromMapDS);
+        printf("Done creating kd-trees\n");
+
+        // publishGlobalMap();
+
+        ROS_INFO("Map reconstructed from scans: %lu corner points, %lu surface points",
+            mapCornerCloud->points.size(), mapSurfCloud->points.size());   
+        
+        publishFrames();
+
+        return true;
+}
+
     void laserCloudInfoHandler(const lio_sam::cloud_infoConstPtr& msgIn)
     {
         // extract time stamp
         timeLaserInfoStamp = msgIn->header.stamp;
         timeLaserInfoCur = msgIn->header.stamp.toSec();
+
+        printf("mapOptimization receives a new feature cloud, time: %f\n", timeLaserInfoCur);
 
         // extract info and feature cloud
         cloudInfo = *msgIn;
@@ -252,34 +345,42 @@ public:
         {
             timeLastProcessing = timeLaserInfoCur;
 
+            printf("updaring initial guess\n");
             updateInitialGuess();
 
             // printf("cloudKeyPoses3D->size(): %d\n", cloudKeyPoses3D->size());
 
+            printf("extracting surrounding key frames\n");
             extractSurroundingKeyFrames();
 
             // printf("cloudKeyPoses3D->size(): %d\n", cloudKeyPoses3D->size());
 
+            printf("downsampling the last scan\n");
             downsampleCurrentScan();
 
             // printf("cloudKeyPoses3D->size(): %d\n", cloudKeyPoses3D->size());
 
+            printf("performing scan-to-map optimization\n");
             scan2MapOptimization();
 
             // printf("cloudKeyPoses3D->size(): %d. loopIndexQueue.size(): %d\n", cloudKeyPoses3D->size(), loopIndexQueue.size());
 
+            printf("adding new key frame\n");
             saveKeyFramesAndFactor();
 
             // printf("cloudKeyPoses3D->size(): %d\n", cloudKeyPoses3D->size());
 
+            printf("correcting map and poses\n");
             correctPoses();
 
             // printf("cloudKeyPoses3D->size(): %d\n", cloudKeyPoses3D->size());
 
+            printf("publishing...\n");
             publishOdometry();
 
             // printf("cloudKeyPoses3D->size(): %d\n", cloudKeyPoses3D->size());
 
+            printf("publishing key poses and frames...\n");
             publishFrames();
         }
     }
@@ -352,20 +453,6 @@ public:
         return thisPose6D;
     }
 
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
     bool saveMapService(lio_sam::save_mapRequest& req, lio_sam::save_mapResponse& res)
     {
       string saveMapDirectory;
@@ -391,8 +478,15 @@ public:
       for (int i = 0; i < (int)cloudKeyPoses3D->size(); i++) {
           *globalCornerCloud += *transformPointCloud(cornerCloudKeyFrames[i],  &cloudKeyPoses6D->points[i]);
           *globalSurfCloud   += *transformPointCloud(surfCloudKeyFrames[i],    &cloudKeyPoses6D->points[i]);
+        //   pcl::io::savePCDFileBinary(saveMapDirectory + "/cornerCloudKeyFrame_" + std::to_string(i) + ".pcd", *cornerCloudKeyFrames[i]);
+        //   pcl::io::savePCDFileBinary(saveMapDirectory + "/surfCloudKeyFrame_" + std::to_string(i) + ".pcd", *surfCloudKeyFrames[i]);
           cout << "\r" << std::flush << "Processing feature cloud " << i << " of " << cloudKeyPoses6D->size() << " ...";
       }
+
+      for (size_t i = 0; i < cornerCloudKeyFrames.size(); ++i) {
+        pcl::io::savePCDFileBinary(saveMapDirectory + "/cornerCloudKeyFrame_" + std::to_string(i) + ".pcd", *cornerCloudKeyFrames[i]);
+        pcl::io::savePCDFileBinary(saveMapDirectory + "/surfCloudKeyFrame_" + std::to_string(i) + ".pcd", *surfCloudKeyFrames[i]);
+    }
 
       if(req.resolution != 0)
       {
@@ -788,21 +882,11 @@ public:
         pubLoopConstraintEdge.publish(markerArray);
     }
 
-
-
-
-
-
-
-    
-
-
-
     void updateInitialGuess()
     {
-        printf("cloudKeyPoses3D->points.empty(): %s\n", cloudKeyPoses3D->points.empty()? "true" : "false");
-        printf("cloudInfo.odomAvailable: %s\n", cloudInfo.odomAvailable? "true" : "false");
-        printf("cloudInfo.imuAvailable: %s\n\n", cloudInfo.imuAvailable? "true" : "false");
+        // printf("cloudKeyPoses3D->points.empty(): %s\n", cloudKeyPoses3D->points.empty()? "true" : "false");
+        // printf("cloudInfo.odomAvailable: %s\n", cloudInfo.odomAvailable? "true" : "false");
+        // printf("cloudInfo.imuAvailable: %s\n\n", cloudInfo.imuAvailable? "true" : "false");
         
         // save current transformation before any processing
         incrementalOdometryAffineFront = trans2Affine3f(transformTobeMapped);
@@ -886,6 +970,7 @@ public:
 
     void extractNearby()
     {
+    
         pcl::PointCloud<PointType>::Ptr surroundingKeyPoses(new pcl::PointCloud<PointType>());
         pcl::PointCloud<PointType>::Ptr surroundingKeyPosesDS(new pcl::PointCloud<PointType>());
         std::vector<int> pointSearchInd;
@@ -893,10 +978,12 @@ public:
 
         static int call_count = 0;
         call_count++;
-        printf("call_count: %d. cloudKeyPoses3D.size(): %d\n", call_count, cloudKeyPoses3D->size());
+        // printf("call_count: %d. cloudKeyPoses3D.size(): %d\n", call_count, cloudKeyPoses3D->size());
         // extract all the nearby key poses and downsample them
+        // printf("Creating surrounding key poses...\n");
         kdtreeSurroundingKeyPoses->setInputCloud(cloudKeyPoses3D); // create kd-tree
         kdtreeSurroundingKeyPoses->radiusSearch(cloudKeyPoses3D->back(), (double)surroundingKeyframeSearchRadius, pointSearchInd, pointSearchSqDis);
+        // printf("Found %d key poses in radius %f.\n", (int)pointSearchInd.size(), surroundingKeyframeSearchRadius);
         for (int i = 0; i < (int)pointSearchInd.size(); ++i)
         {
             int id = pointSearchInd[i];
@@ -910,9 +997,10 @@ public:
             kdtreeSurroundingKeyPoses->nearestKSearch(pt, 1, pointSearchInd, pointSearchSqDis);
             pt.intensity = cloudKeyPoses3D->points[pointSearchInd[0]].intensity;
         }
-
+        
         // also extract some latest key frames in case the robot rotates in one position
         int numPoses = cloudKeyPoses3D->size();
+        
         for (int i = numPoses-1; i >= 0; --i)
         {
             if (timeLaserInfoCur - cloudKeyPoses6D->points[i].time < 10.0)
@@ -921,32 +1009,40 @@ public:
                 break;
         }
 
+        
         extractCloud(surroundingKeyPosesDS);
     }
 
     void extractCloud(pcl::PointCloud<PointType>::Ptr cloudToExtract)
     {
         // fuse the map
+        // printf("Clearing and extracting map...\n");
         laserCloudCornerFromMap->clear();
         laserCloudSurfFromMap->clear(); 
+        // printf("cloudToExtract size: %d\n", (int)cloudToExtract->size());
         for (int i = 0; i < (int)cloudToExtract->size(); ++i)
         {
             if (pointDistance(cloudToExtract->points[i], cloudKeyPoses3D->back()) > surroundingKeyframeSearchRadius)
                 continue;
-
-            int thisKeyInd = (int)cloudToExtract->points[i].intensity;
+            
+                int thisKeyInd = (int)cloudToExtract->points[i].intensity;
+                // printf("Extracting key frame %d...\n", thisKeyInd);
             if (laserCloudMapContainer.find(thisKeyInd) != laserCloudMapContainer.end()) 
             {
+                // printf("Key frame %d found in cache.\n", thisKeyInd);
                 // transformed cloud available
                 *laserCloudCornerFromMap += laserCloudMapContainer[thisKeyInd].first;
                 *laserCloudSurfFromMap   += laserCloudMapContainer[thisKeyInd].second;
+                // printf("Using cached map for key frame %d...\n", thisKeyInd);
             } else {
+                // printf("Key frame %d not in cache.\n", thisKeyInd);
                 // transformed cloud not available
                 pcl::PointCloud<PointType> laserCloudCornerTemp = *transformPointCloud(cornerCloudKeyFrames[thisKeyInd],  &cloudKeyPoses6D->points[thisKeyInd]);
                 pcl::PointCloud<PointType> laserCloudSurfTemp = *transformPointCloud(surfCloudKeyFrames[thisKeyInd],    &cloudKeyPoses6D->points[thisKeyInd]);
                 *laserCloudCornerFromMap += laserCloudCornerTemp;
                 *laserCloudSurfFromMap   += laserCloudSurfTemp;
                 laserCloudMapContainer[thisKeyInd] = make_pair(laserCloudCornerTemp, laserCloudSurfTemp);
+                // printf("Transforming and caching map for key frame %d...\n", thisKeyInd);
             }
             
         }
@@ -958,7 +1054,7 @@ public:
         // Downsample the surrounding surf key frames (or map)
         downSizeFilterSurf.setInputCloud(laserCloudSurfFromMap);
         downSizeFilterSurf.filter(*laserCloudSurfFromMapDS);
-        laserCloudSurfFromMapDSNum = laserCloudSurfFromMapDS->size();
+        laserCloudSurfFromMapDSNum = laserCloudSurfFromMapDS->size();        
 
         // clear map cache if too large
         if (laserCloudMapContainer.size() > 1000)
@@ -1012,6 +1108,7 @@ public:
 
             pointOri = laserCloudCornerLastDS->points[i];
             pointAssociateToMap(&pointOri, &pointSel);
+            printf("Corner pointSel: %f, %f, %f\n", pointSel.x, pointSel.y, pointSel.z);
             kdtreeCornerFromMap->nearestKSearch(pointSel, 5, pointSearchInd, pointSearchSqDis);
 
             cv::Mat matA1(3, 3, CV_32F, cv::Scalar::all(0));
@@ -1316,7 +1413,6 @@ public:
         {
             kdtreeCornerFromMap->setInputCloud(laserCloudCornerFromMapDS);
             kdtreeSurfFromMap->setInputCloud(laserCloudSurfFromMapDS);
-
             for (int iterCount = 0; iterCount < 30; iterCount++)
             {
                 laserCloudOri->clear();
@@ -1540,7 +1636,7 @@ public:
         // gtSAMgraph.print("GTSAM Graph:\n");
 
         // update iSAM
-        printf("gtSAMgraph.size(): %d\n", gtSAMgraph.size());
+        // printf("gtSAMgraph.size(): %d\n", gtSAMgraph.size());
         isam->update(gtSAMgraph, initialEstimate);
         isam->update();
 
@@ -1732,6 +1828,7 @@ public:
 
     void publishFrames()
     {
+        printf("timeLaserInfoStamp: %f \n", timeLaserInfoStamp.toSec());
         if (cloudKeyPoses3D->points.empty())
             return;
         // publish key poses
@@ -1795,6 +1892,11 @@ int main(int argc, char** argv)
     mapOptimization MO;
 
     ROS_INFO("\033[1;32m----> Map Optimization Started.\033[0m");
+
+    if (!MO.loadMap()) {
+        ROS_ERROR("Failed to load map");
+        return -1;
+    }
     
     std::thread loopthread(&mapOptimization::loopClosureThread, &MO);
     std::thread visualizeMapThread(&mapOptimization::visualizeGlobalMapThread, &MO);

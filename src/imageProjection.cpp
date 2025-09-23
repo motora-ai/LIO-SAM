@@ -199,7 +199,7 @@ public:
 
     bool cachePointCloud(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg)
     {
-        cout << "laserCloudIn datasize: " << laserCloudMsg->data.size() << endl;
+        // cout << "laserCloudIn datasize: " << laserCloudMsg->data.size() << endl;
         // cache point cloud
         cloudQueue.push_back(*laserCloudMsg);
         if (cloudQueue.size() <= 2)
@@ -637,9 +637,9 @@ public:
             fullCloud->points[index] = thisPoint;
         }
 
-        printf("fullCloud size: %d. rangeMat size: %d. cloudSize: %d. deskews: %d. range_short: %d. rowOOB: %d. colOOB: %d. occupied %d.\n",
-               fullCloud->points.size(), rangeMat.rows*rangeMat.cols, laserCloudIn->points.size(), total_deskews,
-               range_short, rowOOB, colOOB, occupied);
+        // printf("fullCloud size: %d. rangeMat size: %d. cloudSize: %d. deskews: %d. range_short: %d. rowOOB: %d. colOOB: %d. occupied %d.\n",
+        //        fullCloud->points.size(), rangeMat.rows*rangeMat.cols, laserCloudIn->points.size(), total_deskews,
+        //        range_short, rowOOB, colOOB, occupied);
     }
 
     void cloudExtraction()
@@ -673,7 +673,7 @@ public:
             cloudInfo.endRingIndex[i] = count -1 - 5;
         }
 
-        printf("extractedCloud size: %d. count: %d. rejected: %d\n", extractedCloud->points.size(), count, rejected_count);
+        // printf("extractedCloud size: %d. count: %d. rejected: %d\n", extractedCloud->points.size(), count, rejected_count);
     }
     
     void publishClouds()
