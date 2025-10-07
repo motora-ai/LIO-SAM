@@ -331,8 +331,6 @@ public:
         timeLaserInfoStamp = msgIn->header.stamp;
         timeLaserInfoCur = msgIn->header.stamp.toSec();
 
-        printf("mapOptimization receives a new feature cloud, time: %f\n", timeLaserInfoCur);
-
         // extract info and feature cloud
         cloudInfo = *msgIn;
         pcl::fromROSMsg(msgIn->cloud_corner,  *laserCloudCornerLast);
@@ -345,42 +343,34 @@ public:
         {
             timeLastProcessing = timeLaserInfoCur;
 
-            printf("updaring initial guess\n");
             updateInitialGuess();
 
             // printf("cloudKeyPoses3D->size(): %d\n", cloudKeyPoses3D->size());
 
-            printf("extracting surrounding key frames\n");
             extractSurroundingKeyFrames();
 
             // printf("cloudKeyPoses3D->size(): %d\n", cloudKeyPoses3D->size());
 
-            printf("downsampling the last scan\n");
             downsampleCurrentScan();
 
             // printf("cloudKeyPoses3D->size(): %d\n", cloudKeyPoses3D->size());
 
-            printf("performing scan-to-map optimization\n");
             scan2MapOptimization();
 
             // printf("cloudKeyPoses3D->size(): %d. loopIndexQueue.size(): %d\n", cloudKeyPoses3D->size(), loopIndexQueue.size());
 
-            printf("adding new key frame\n");
             saveKeyFramesAndFactor();
 
             // printf("cloudKeyPoses3D->size(): %d\n", cloudKeyPoses3D->size());
 
-            printf("correcting map and poses\n");
             correctPoses();
 
             // printf("cloudKeyPoses3D->size(): %d\n", cloudKeyPoses3D->size());
 
-            printf("publishing...\n");
             publishOdometry();
 
             // printf("cloudKeyPoses3D->size(): %d\n", cloudKeyPoses3D->size());
 
-            printf("publishing key poses and frames...\n");
             publishFrames();
         }
     }
@@ -597,18 +587,7 @@ public:
         downSizeFilterGlobalMapKeyFrames.filter(*globalMapKeyFramesDS);
         publishCloud(pubLaserCloudSurround, globalMapKeyFramesDS, timeLaserInfoStamp, odometryFrame);
     }
-
-
-
-
-
-
-
-
-
-
-
-
+    
     void loopClosureThread()
     {
         if (loopClosureEnableFlag == false)
@@ -1108,7 +1087,7 @@ public:
 
             pointOri = laserCloudCornerLastDS->points[i];
             pointAssociateToMap(&pointOri, &pointSel);
-            printf("Corner pointSel: %f, %f, %f\n", pointSel.x, pointSel.y, pointSel.z);
+            // printf("Corner pointSel: %f, %f, %f\n", pointSel.x, pointSel.y, pointSel.z);
             kdtreeCornerFromMap->nearestKSearch(pointSel, 5, pointSearchInd, pointSearchSqDis);
 
             cv::Mat matA1(3, 3, CV_32F, cv::Scalar::all(0));
@@ -1828,7 +1807,6 @@ public:
 
     void publishFrames()
     {
-        printf("timeLaserInfoStamp: %f \n", timeLaserInfoStamp.toSec());
         if (cloudKeyPoses3D->points.empty())
             return;
         // publish key poses
