@@ -211,7 +211,11 @@ public:
 
         pubImuOdometry = nh.advertise<nav_msgs::Odometry> (odomTopic+"_incremental", 2000);
 
-        boost::shared_ptr<gtsam::PreintegrationParams> p = gtsam::PreintegrationParams::MakeSharedU(imuGravity);
+        // boost::shared_ptr<gtsam::PreintegrationParams> p = gtsam::PreintegrationParams::MakeSharedU(imuGravity);
+        // boost::shared_ptr<gtsam::PreintegrationParams> p = gtsam::PreintegrationParams::MakeSharedU(g_lidar);
+        boost::shared_ptr<gtsam::PreintegrationParams> p = boost::make_shared<gtsam::PreintegrationParams>();
+        gtsam::Vector3 g_lidar(-9.48, 0.00, +2.54); // gravity vector in lidar frame
+        p->n_gravity = g_lidar;
         p->accelerometerCovariance  = gtsam::Matrix33::Identity(3,3) * pow(imuAccNoise, 2); // acc white noise in continuous
         p->gyroscopeCovariance      = gtsam::Matrix33::Identity(3,3) * pow(imuGyrNoise, 2); // gyro white noise in continuous
         p->integrationCovariance    = gtsam::Matrix33::Identity(3,3) * pow(1e-4, 2); // error committed in integrating position from velocities
@@ -227,6 +231,20 @@ public:
         imuIntegratorImu_ = new gtsam::PreintegratedImuMeasurements(p, prior_imu_bias); // setting up the IMU integration for IMU message thread
         imuIntegratorOpt_ = new gtsam::PreintegratedImuMeasurements(p, prior_imu_bias); // setting up the IMU integration for optimization        
     }
+
+    // // Calcula o vetor de gravidade no frame da IMU a partir da rotação inicial R_wi
+    // // R_wi: rotação que leva vetor do frame IMU para o frame World
+    // // gravity_mag: magnitude da gravidade (normalmente 9.81)
+    // gtsam::Vector3 computeGravityInImuFrame(const gtsam::Rot3& R_wi, double gravity_mag = 9.81)
+    // {
+    //     // Vetor da gravidade no frame do mundo (eixo Z negativo)
+    //     gtsam::Vector3 g_world(0.0, 0.0, -gravity_mag);
+
+    //     // Transformar para o frame da IMU: g_imu = R_wi.transpose() * g_world
+    //     gtsam::Vector3 g_imu = R_wi.transpose() * g_world;
+
+    //     return g_imu;
+    // }
 
     void resetOptimization()
     {

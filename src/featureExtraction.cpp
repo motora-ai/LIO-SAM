@@ -169,6 +169,7 @@ public:
                     int ind = cloudSmoothness[k].ind;
                     if (cloudNeighborPicked[ind] == 0 && cloudCurvature[ind] > edgeThreshold)
                     {
+                        printf("curvature > edge: %f\n", cloudCurvature[ind]);
                         largestPickedNum++;
                         if (largestPickedNum <= 20){
                             cloudLabel[ind] = 1;
@@ -200,7 +201,7 @@ public:
                     int ind = cloudSmoothness[k].ind;
                     if (cloudNeighborPicked[ind] == 0 && cloudCurvature[ind] < surfThreshold)
                     {
-
+                        printf("curvature < surf: %f\n", cloudCurvature[ind]);
                         cloudLabel[ind] = -1;
                         cloudNeighborPicked[ind] = 1;
 
