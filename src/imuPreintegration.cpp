@@ -201,8 +201,12 @@ public:
     
     // T_bl: tramsform points from lidar frame to imu frame 
     gtsam::Pose3 imu2Lidar = gtsam::Pose3(gtsam::Rot3(1, 0, 0, 0), gtsam::Point3(-extTrans.x(), -extTrans.y(), -extTrans.z()));
+    // gtsam::Pose3 imu2Lidar = gtsam::Pose3(gtsam::Rot3(extRot.transpose()), gtsam::Point3(-extTrans.x(), -extTrans.y(), -extTrans.z()));
+    
     // T_lb: tramsform points from imu frame to lidar frame
-    gtsam::Pose3 lidar2Imu = gtsam::Pose3(gtsam::Rot3(1, 0, 0, 0), gtsam::Point3(extTrans.x(), extTrans.y(), extTrans.z()));
+    // gtsam::Pose3 lidar2Imu = gtsam::Pose3(gtsam::Rot3(1, 0, 0, 0), gtsam::Point3(extTrans.x(), extTrans.y(), extTrans.z()));
+    gtsam::Pose3 lidar2Imu = gtsam::Pose3(gtsam::Rot3(extRot), gtsam::Point3(extTrans.x(), extTrans.y(), extTrans.z()));
+
 
     IMUPreintegration()
     {
@@ -211,11 +215,11 @@ public:
 
         pubImuOdometry = nh.advertise<nav_msgs::Odometry> (odomTopic+"_incremental", 2000);
 
-        // boost::shared_ptr<gtsam::PreintegrationParams> p = gtsam::PreintegrationParams::MakeSharedU(imuGravity);
-        // boost::shared_ptr<gtsam::PreintegrationParams> p = gtsam::PreintegrationParams::MakeSharedU(g_lidar);
-        boost::shared_ptr<gtsam::PreintegrationParams> p = boost::make_shared<gtsam::PreintegrationParams>();
-        gtsam::Vector3 g_lidar(-9.48, 0.00, +2.54); // gravity vector in lidar frame
-        p->n_gravity = g_lidar;
+        boost::shared_ptr<gtsam::PreintegrationParams> p = gtsam::PreintegrationParams::MakeSharedU(imuGravity);
+        // Eigen::Vector3d g_world(0, 0, -9.81);
+        // Eigen::Vector3d g_lidar = extRot * g_world;
+        // boost::shared_ptr<gtsam::PreintegrationParams> p = gtsam::PreintegrationParams::MakeSharedU(g_lidar.norm());
+        // p->n_gravity = gtsam::Vector3(g_lidar.x(), g_lidar.y(), g_lidar.z());
         p->accelerometerCovariance  = gtsam::Matrix33::Identity(3,3) * pow(imuAccNoise, 2); // acc white noise in continuous
         p->gyroscopeCovariance      = gtsam::Matrix33::Identity(3,3) * pow(imuGyrNoise, 2); // gyro white noise in continuous
         p->integrationCovariance    = gtsam::Matrix33::Identity(3,3) * pow(1e-4, 2); // error committed in integrating position from velocities
@@ -232,19 +236,19 @@ public:
         imuIntegratorOpt_ = new gtsam::PreintegratedImuMeasurements(p, prior_imu_bias); // setting up the IMU integration for optimization        
     }
 
-    // // Calcula o vetor de gravidade no frame da IMU a partir da rotação inicial R_wi
-    // // R_wi: rotação que leva vetor do frame IMU para o frame World
-    // // gravity_mag: magnitude da gravidade (normalmente 9.81)
-    // gtsam::Vector3 computeGravityInImuFrame(const gtsam::Rot3& R_wi, double gravity_mag = 9.81)
-    // {
-    //     // Vetor da gravidade no frame do mundo (eixo Z negativo)
-    //     gtsam::Vector3 g_world(0.0, 0.0, -gravity_mag);
+    // Calcula o vetor de gravidade no frame da IMU a partir da rotação inicial R_wi
+    // R_wi: rotação que leva vetor do frame IMU para o frame World
+    // gravity_mag: magnitude da gravidade (normalmente 9.81)
+    gtsam::Vector3 computeGravityInImuFrame(const gtsam::Rot3& R_wi, double gravity_mag = 9.81)
+    {
+        // Vetor da gravidade no frame do mundo (eixo Z negativo)
+        gtsam::Vector3 g_world(0.0, 0.0, -gravity_mag);
 
-    //     // Transformar para o frame da IMU: g_imu = R_wi.transpose() * g_world
-    //     gtsam::Vector3 g_imu = R_wi.transpose() * g_world;
+        // Transformar para o frame da IMU: g_imu = R_wi.transpose() * g_world
+        gtsam::Vector3 g_imu = R_wi.transpose() * g_world;
 
-    //     return g_imu;
-    // }
+        return g_imu;
+    }
 
     void resetOptimization()
     {
