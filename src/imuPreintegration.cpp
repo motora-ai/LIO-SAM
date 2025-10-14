@@ -204,8 +204,8 @@ public:
     // gtsam::Pose3 imu2Lidar = gtsam::Pose3(gtsam::Rot3(extRot.transpose()), gtsam::Point3(-extTrans.x(), -extTrans.y(), -extTrans.z()));
     
     // T_lb: tramsform points from imu frame to lidar frame
-    // gtsam::Pose3 lidar2Imu = gtsam::Pose3(gtsam::Rot3(1, 0, 0, 0), gtsam::Point3(extTrans.x(), extTrans.y(), extTrans.z()));
-    gtsam::Pose3 lidar2Imu = gtsam::Pose3(gtsam::Rot3(extRot), gtsam::Point3(extTrans.x(), extTrans.y(), extTrans.z()));
+    gtsam::Pose3 lidar2Imu = gtsam::Pose3(gtsam::Rot3(1, 0, 0, 0), gtsam::Point3(extTrans.x(), extTrans.y(), extTrans.z()));
+    // gtsam::Pose3 lidar2Imu = gtsam::Pose3(gtsam::Rot3(extRot), gtsam::Point3(extTrans.x(), extTrans.y(), extTrans.z()));
 
 
     IMUPreintegration()
