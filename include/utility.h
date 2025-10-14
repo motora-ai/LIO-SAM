@@ -118,6 +118,7 @@ public:
     Eigen::Matrix3d R_W2NED;
     Eigen::Vector3d extTrans;
     Eigen::Quaterniond extQRPY;
+    Eigen::Quaterniond extQRPY_inv;
     Eigen::Quaterniond quat_W2NED;
 
     // LOAM
@@ -224,6 +225,7 @@ public:
         R_W2NED  = Eigen::Map<const Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>(R_W2NEDV.data(), 3, 3);
         extTrans = Eigen::Map<const Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>(extTransV.data(), 3, 1);
         extQRPY  = Eigen::Quaterniond(extRPY);
+        extQRPY_inv  = Eigen::Quaterniond(extRPY.inv());
         quat_W2NED  = Eigen::Quaterniond(R_W2NED);
 
         nh.param<float>("lio_sam/edgeThreshold", edgeThreshold, 0.1);
@@ -278,7 +280,7 @@ public:
         imu_out.angular_velocity.z = gyr.z();
         // rotate roll pitch yaw
         Eigen::Quaterniond q_from(imu_in.orientation.w, imu_in.orientation.x, imu_in.orientation.y, imu_in.orientation.z);
-        Eigen::Quaterniond q_final = quat_W2NED * q_from * extQRPY.inv();
+        Eigen::Quaterniond q_final = quat_W2NED * q_from * extQRPY_inv.inv();
         imu_out.orientation.x = q_final.x();
         imu_out.orientation.y = q_final.y();
         imu_out.orientation.z = q_final.z();
