@@ -443,8 +443,19 @@ public:
         return thisPose6D;
     }
 
+    std::string currentDateTime() {
+        auto now = std::chrono::system_clock::now();
+        std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+        std::tm tm = *std::localtime(&now_time);
+    
+        std::ostringstream oss;
+        oss << std::put_time(&tm, "_%Y_%m_%d_%H_%M_%S");
+        return oss.str();
+    }
+
     bool saveMapService(lio_sam::save_mapRequest& req, lio_sam::save_mapResponse& res)
     {
+      bool saveKeyFrames = false;
       string saveMapDirectory;
 
       cout << "****************************************************" << endl;
@@ -452,13 +463,14 @@ public:
       if(req.destination.empty()) saveMapDirectory = savePCDDirectory;
       else saveMapDirectory = req.destination;
       cout << "Save destination: " << saveMapDirectory << endl;
+      std::string timestamp = currentDateTime();
       // create directory and remove old files;
-      int unused = system((std::string("exec rm -r ") + saveMapDirectory).c_str());
-      unused = system((std::string("mkdir -p ") + saveMapDirectory).c_str());
+      //   int unused = system((std::string("exec rm -rf ") + saveMapDirectory).c_str());
+      //   unused = system((std::string("mkdir -p ") + saveMapDirectory).c_str());
       // save key frame transformations
       pcl::PCDWriter writer;
-      writer.writeASCII(saveMapDirectory + "/KfCloudPose.pcd", *cloudKeyPoses6D, 18);
-      writer.writeASCII(saveMapDirectory + "/trajectory.pcd", *cloudKeyPoses3D, 18);
+      writer.writeASCII(saveMapDirectory + "/KfCloudPose" + timestamp + ".pcd", *cloudKeyPoses6D, 18);
+      writer.writeASCII(saveMapDirectory + "/trajectory" + timestamp + ".pcd", *cloudKeyPoses3D, 18);
       // extract global point cloud map
       pcl::PointCloud<PointType>::Ptr globalCornerCloud(new pcl::PointCloud<PointType>());
       pcl::PointCloud<PointType>::Ptr globalCornerCloudDS(new pcl::PointCloud<PointType>());
@@ -473,10 +485,13 @@ public:
           cout << "\r" << std::flush << "Processing feature cloud " << i << " of " << cloudKeyPoses6D->size() << " ...";
       }
 
-      for (size_t i = 0; i < cornerCloudKeyFrames.size(); ++i) {
-        pcl::io::savePCDFileBinary(saveMapDirectory + "/cornerCloudKeyFrame_" + std::to_string(i) + ".pcd", *cornerCloudKeyFrames[i]);
-        pcl::io::savePCDFileBinary(saveMapDirectory + "/surfCloudKeyFrame_" + std::to_string(i) + ".pcd", *surfCloudKeyFrames[i]);
-    }
+      if (saveKeyFrames)
+      {
+        for (size_t i = 0; i < cornerCloudKeyFrames.size(); ++i) {
+            pcl::io::savePCDFileBinary(saveMapDirectory + "/cornerCloudKeyFrame_" + timestamp +"_" + std::to_string(i) + ".pcd", *cornerCloudKeyFrames[i]);
+            pcl::io::savePCDFileBinary(saveMapDirectory + "/surfCloudKeyFrame_" + timestamp + "_" + std::to_string(i) + ".pcd", *surfCloudKeyFrames[i]);
+        }
+      }
 
       if(req.resolution != 0)
       {
@@ -486,26 +501,26 @@ public:
         downSizeFilterCorner.setInputCloud(globalCornerCloud);
         downSizeFilterCorner.setLeafSize(req.resolution, req.resolution, req.resolution);
         downSizeFilterCorner.filter(*globalCornerCloudDS);
-        pcl::io::savePCDFileBinary(saveMapDirectory + "/CornerMap.pcd", *globalCornerCloudDS);
+        pcl::io::savePCDFileBinary(saveMapDirectory + "/CornerMap" + timestamp + ".pcd", *globalCornerCloudDS);
         // down-sample and save surf cloud
         downSizeFilterSurf.setInputCloud(globalSurfCloud);
         downSizeFilterSurf.setLeafSize(req.resolution, req.resolution, req.resolution);
         downSizeFilterSurf.filter(*globalSurfCloudDS);
-        pcl::io::savePCDFileBinary(saveMapDirectory + "/SurfMap.pcd", *globalSurfCloudDS);
+        pcl::io::savePCDFileBinary(saveMapDirectory + "/SurfMap" + timestamp + ".pcd", *globalSurfCloudDS);
       }
       else
       {
         // save corner cloud
-        pcl::io::savePCDFileBinary(saveMapDirectory + "/CornerMap.pcd", *globalCornerCloud);
+        pcl::io::savePCDFileBinary(saveMapDirectory + "/CornerMap" + timestamp + ".pcd", *globalCornerCloud);
         // save surf cloud
-        pcl::io::savePCDFileBinary(saveMapDirectory + "/SurfMap.pcd", *globalSurfCloud);
+        pcl::io::savePCDFileBinary(saveMapDirectory + "/SurfMap" + timestamp + ".pcd", *globalSurfCloud);
       }
 
       // save global point cloud map
       *globalMapCloud += *globalCornerCloud;
       *globalMapCloud += *globalSurfCloud;
 
-      int ret = pcl::io::savePCDFileBinary(saveMapDirectory + "/GlobalMap.pcd", *globalMapCloud);
+      int ret = pcl::io::savePCDFileBinary(saveMapDirectory + "/GlobalMap" + timestamp + ".pcd", *globalMapCloud);
       res.success = ret == 0;
 
       downSizeFilterCorner.setLeafSize(mappingCornerLeafSize, mappingCornerLeafSize, mappingCornerLeafSize);
