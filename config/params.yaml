@@ -30,7 +30,7 @@ lio_sam:
   N_SCAN: 32                                  # number of lidar channel (i.e., 16, 32, 64, 128)
   Horizon_SCAN: 1024                          # lidar horizontal resolution (Velodyne:1800, Ouster: 512, 1024, 2048)
   downsampleRate: 1                           # default: 1. Downsample your data if too many points. i.e., 16 = 64 / 4, 16 = 16 / 1
-  lidarMinRange:  0.3                         # default: 1.0, minimum lidar range to be used
+  lidarMinRange:  1                         # default: 1.0, minimum lidar range to be used
   lidarMaxRange:  1000.0                      # default: 1000.0, maximum lidar range to be used
 
   # IMU Settings
@@ -43,27 +43,27 @@ lio_sam:
 
   # Extrinsics (lidar -> IMU)
   # extrinsicTrans: [0.05, 0.0, -0.055]
-  extrinsicTrans: [0.0, 0.0, 0.0]
+  extrinsicTrans: [-0.1, 0.0, 0.15]
 
-  extrinsicRot: [ 1,  0,  0,
-                  0,  1,  0,
-                  0,  0,  1]
+  # extrinsicRot: [ 1,  0,  0,
+  #                 0,  1,  0,
+  #                 0,  0,  1]
 
-  extrinsicRPY: [ 1,  0,  0,
-                  0,  1,  0,
-                  0,  0,  1]
+  # extrinsicRPY: [ 1,  0,  0,
+  #                 0,  1,  0,
+  #                 0,  0,  1]
 
-  # extrinsicRot: [0.2588,  0,  0.9659,
-  #                0,  -1,  0,
-  #                0.9659,  0,  -0.2588]
+  extrinsicRot: [-0.2588,  0,  -0.9659,
+                 0,  1,  0,
+                 0.9659,  0,  -0.2588]
 
-  # extrinsicRPY: [0.2588,  0,  0.9659,
-  #                0,  -1,  0,
-  #                0.9659,  0,  -0.2588]
+  extrinsicRPY: [-0.2588,  0,  -0.9659,
+                 0,  1,  0,
+                 0.9659,  0,  -0.2588]
 
   R_W2NED:      [ 1,  0,  0,
-                  0, 1,  0,
-                  0,  0, 1]
+                  0, -1,  0,
+                  0,  0, -1]
 
   # LOAM feature threshold
   edgeThreshold: 1.0
